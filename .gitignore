@@ -1,0 +1,14 @@
+﻿venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+.env
+outputs/
+.cache/
+*.mp3
+*.wav
+*.flac
+node_modules/
+.DS_Store

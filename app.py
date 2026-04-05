@@ -102,14 +102,13 @@ with st.sidebar:
 
     model_size = st.selectbox(
         "Whisper Model",
-        ["tiny", "base", "small", "medium", "large-v2", "large-v3"],
-        index=2,
-        help="Larger = more accurate, slower",
+        ["base"],
+        index=0,
     )
-    device = st.selectbox("Device", ["cpu", "cuda", "mps"], index=0)
+    device = st.selectbox("Device", ["cpu"], index=0)
     backend = st.selectbox(
         "Translation Backend",
-        ["helsinki", "openai", "google", "deepl"],
+        ["helsinki"],
         help="Helsinki = free & offline. Others need API keys.",
     )
     handle_slang = st.toggle("Handle Slang & Informal Language", value=True)

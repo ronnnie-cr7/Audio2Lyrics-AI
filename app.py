@@ -113,8 +113,6 @@ with st.sidebar:
     )
     handle_slang = st.toggle("Handle Slang & Informal Language", value=True)
     gen_srt = st.toggle("Generate SRT Subtitle File", value=True)
-    gen_bilingual = st.toggle("Bilingual SRT (Original + Translation)", value=False)
-
     st.divider()
     st.caption("Supported formats: MP3, WAV, FLAC, OGG, M4A, AAC")
     st.caption("Best results: songs with clear vocals")

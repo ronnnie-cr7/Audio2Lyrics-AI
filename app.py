@@ -109,7 +109,7 @@ with st.sidebar:
     gen_bilingual = st.toggle(
         "Bilingual SRT",
         value=False,
-        help="Shows original lyrics + English translation stacked. Great for mixed-language songs like Maria Maria.",
+        help="Shows original lyrics + English translation stacked. Great for mixed-language songs.",
     )
 
     st.divider()

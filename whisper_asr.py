@@ -72,13 +72,10 @@ class WhisperASR:
             word_timestamps=True,
             vad_filter=True,                        # skip silence / non-speech
             vad_parameters=dict(min_silence_duration_ms=500),
-            condition_on_previous_text=True,
-            initial_prompt=(
-                "Song lyrics. Musical performance. "
-                "Include slang, informal contractions, and rap lyrics accurately."
-            ),
-            log_prob_threshold=-1.0,
-            no_speech_threshold=0.6,
+            condition_on_previous_text=False,
+            initial_prompt=("initial_prompt="Transcribe the song lyrics only."),
+            log_prob_threshold=-0.5,
+            no_speech_threshold=0.8,
         )
 
         segments = []

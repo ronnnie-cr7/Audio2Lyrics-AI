@@ -138,6 +138,7 @@ class LyricsTranslator:
         "ar": "Helsinki-NLP/opus-mt-ar-en",
         # Hindi → use multilingual OPUS model
         "hi": "Helsinki-NLP/opus-mt-mul-en",
+        "sw": "Helsinki-NLP/opus-mt-mul-en",
         "tr": "Helsinki-NLP/opus-mt-tr-en",
         "pl": "Helsinki-NLP/opus-mt-pl-en",
         "uk": "Helsinki-NLP/opus-mt-uk-en",
@@ -208,15 +209,25 @@ class LyricsTranslator:
         return text
 
     def _helsinki(self, text: str, src: str) -> str:
-        """MarianMT via HuggingFace — fully offline after first download."""
+    """MarianMT via HuggingFace — fully offline after first download."""
         if src not in self._models:
             from transformers import MarianMTModel, MarianTokenizer
+    
+            # Try specific model first, fall back to multilingual
             model_name = self.HELSINKI_MODELS.get(src, f"Helsinki-NLP/opus-mt-{src}-en")
-            logger.info(f"  Loading MarianMT: {model_name}")
-            tok = MarianTokenizer.from_pretrained(model_name)
-            mdl = MarianMTModel.from_pretrained(model_name)
+            fallback = "Helsinki-NLP/opus-mt-mul-en"
+    
+            try:
+                logger.info(f"  Loading MarianMT: {model_name}")
+                tok = MarianTokenizer.from_pretrained(model_name)
+                mdl = MarianMTModel.from_pretrained(model_name)
+            except Exception:
+                logger.warning(f"  Model {model_name} not found, falling back to multilingual model")
+                tok = MarianTokenizer.from_pretrained(fallback)
+                mdl = MarianMTModel.from_pretrained(fallback)
+    
             self._models[src] = (tok, mdl)
-
+    
         tokenizer, model = self._models[src]
         inputs = tokenizer([text], return_tensors="pt", padding=True,
                            truncation=True, max_length=512)

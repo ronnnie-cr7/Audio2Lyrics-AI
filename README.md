@@ -50,5 +50,5 @@ Upload a song → click translate → get synced English lyrics.
 
 ```bash
 pip install -r requirements.txt
-streamlit run ui/app.py
+streamlit run app.py
 

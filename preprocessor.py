@@ -34,12 +34,11 @@ class AudioPreprocessor:
                 import demucs  # noqa
                 self._demucs_available = True
             except ImportError:
-                logger.warning("demucs not installed – vocal separation disabled.")
+                logger.warning("demucs not installed - vocal separation disabled.")
                 self._demucs_available = False
         else:
             self._demucs_available = False
 
-    # ------------------------------------------------------------------
     def process(self, audio_path: str) -> Tuple[str, float]:
         """
         Full preprocessing chain.
@@ -51,10 +50,12 @@ class AudioPreprocessor:
 
         logger.info(f"  Loading {audio_path}")
         y, sr = self._load(audio_path)
+
+        # FIX: convert to mono FIRST so len(y) = num samples not num channels
+        y = self._to_mono(y)
         duration = len(y) / sr
 
-        logger.info(f"  Duration: {duration:.1f}s | SR: {sr} → {self.target_sr}")
-        y = self._to_mono(y)
+        logger.info(f"  Duration: {duration:.1f}s | SR: {sr} -> {self.target_sr}")
         y = self._resample(y, sr)
         y = self._normalise(y)
 
@@ -67,7 +68,6 @@ class AudioPreprocessor:
         out_path = self._save_temp(y)
         return out_path, duration
 
-    # ------------------------------------------------------------------
     def _load(self, path: str) -> Tuple[np.ndarray, int]:
         ext = Path(path).suffix.lower()
         if ext != ".wav":
@@ -89,27 +89,24 @@ class AudioPreprocessor:
         return y
 
     def _normalise(self, y: np.ndarray) -> np.ndarray:
-        """Peak normalisation to -1 dBFS."""
         peak = np.max(np.abs(y))
         if peak > 0:
             y = y / peak * 0.9
         return y
 
     def _denoise(self, y: np.ndarray) -> np.ndarray:
-        """Spectral noise reduction using noisereduce."""
         try:
             import noisereduce as nr
-            # Use first 0.5 s as noise profile (silence / intro)
             noise_sample = y[: self.target_sr // 2]
             return nr.reduce_noise(y=y, sr=self.target_sr, y_noise=noise_sample, prop_decrease=0.8)
         except ImportError:
-            logger.warning("noisereduce not installed – skipping denoising.")
+            logger.warning("noisereduce not installed - skipping denoising.")
             return y
 
     def _isolate_vocals(self, original_path: str, fallback: np.ndarray) -> np.ndarray:
-        """Runs demucs htdemucs model to extract vocals stem."""
         try:
-            import subprocess, glob
+            import subprocess
+            import glob
             out_dir = tempfile.mkdtemp()
             subprocess.run(
                 ["python", "-m", "demucs", "--two-stems=vocals", "-o", out_dir, original_path],
@@ -121,7 +118,7 @@ class AudioPreprocessor:
                 logger.info("  Vocal stem extracted via demucs.")
                 return y
         except Exception as e:
-            logger.warning(f"  Vocal isolation failed: {e} – using full mix.")
+            logger.warning(f"  Vocal isolation failed: {e} - using full mix.")
         return fallback
 
     def _save_temp(self, y: np.ndarray) -> str:
@@ -129,15 +126,16 @@ class AudioPreprocessor:
         sf.write(tmp, y, self.target_sr)
         return tmp
 
-    # ------------------------------------------------------------------
     @staticmethod
     def get_audio_info(path: str) -> dict:
-        """Returns metadata dict without full load."""
         y, sr = librosa.load(path, sr=None, mono=True, duration=30)
         tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+        # FIX: librosa.get_duration(path=) is deprecated - use soundfile instead
+        with sf.SoundFile(path) as f:
+            duration = len(f) / f.samplerate
         return {
             "sample_rate": sr,
-            "duration": librosa.get_duration(path=path),
+            "duration": duration,
             "estimated_tempo_bpm": float(tempo),
             "channels": 1,
         }

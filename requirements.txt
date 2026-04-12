@@ -5,13 +5,13 @@ pydub>=0.25.1
 noisereduce>=3.0.0
 
 # ── ASR ─────────────────────────────────────────────────────────────────────
-faster-whisper>=1.0.0          # recommended (CTranslate2 backend)
+faster-whisper>=1.0.0
 # openai-whisper>=20231117      # fallback – uncomment if faster-whisper fails
 
 # ── Translation ─────────────────────────────────────────────────────────────
 transformers>=4.40.0
 sentencepiece>=0.2.0
-torch>=2.1.0
+torch==2.1.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu
 sacremoses>=0.1.1
 
 # ── Evaluation ──────────────────────────────────────────────────────────────
@@ -32,6 +32,4 @@ streamlit>=1.35.0
 # ── Utilities ───────────────────────────────────────────────────────────────
 numpy>=1.24.0
 ffmpeg-python>=0.2.0
-
-
 langdetect>=1.0.9

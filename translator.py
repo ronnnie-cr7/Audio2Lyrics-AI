@@ -1,9 +1,10 @@
 """
 Lyrics Translation Module
-- Per-segment language detection (handles mixed-language songs)
+- Per-segment language detection (handles mixed-language songs like Maria Maria)
 - Primary: Helsinki-NLP MarianMT (offline, free)
+- Fallback to multilingual model if specific model missing
 - Slang normalisation layer
-- Post-processing
+- Long segment chunking (fixes 512 token limit)
 """
 
 import re
@@ -23,15 +24,13 @@ SLANG_MAP = {
     "wiri wiri": "non-stop",
     "chimba": "cool",
     "parce": "friend",
-    "nero": "buddy",
     "pana": "friend",
     "vaina": "thing",
-    "cabron": "badass",
     "guey": "dude",
     "chale": "no way",
     "orale": "alright",
     "carnal": "brother",
-    "jefa": "mom / boss",
+    "jefa": "mom or boss",
     "simon": "yes",
     "chido": "cool",
     "neta": "for real",
@@ -49,12 +48,10 @@ SLANG_MAP = {
     "dost": "friend",
     "pagal": "crazy",
     "bindaas": "carefree",
-    "pa'": "for",
-    "na'": "nothing",
-    "to'": "everything",
+    "pa": "for",
 }
 
-# Languages that map directly to a working Helsinki model
+# Known working Helsinki models - anything not listed falls back to multilingual
 HELSINKI_MODELS = {
     "es": "Helsinki-NLP/opus-mt-es-en",
     "fr": "Helsinki-NLP/opus-mt-fr-en",
@@ -71,14 +68,17 @@ HELSINKI_MODELS = {
     "pl": "Helsinki-NLP/opus-mt-pl-en",
     "uk": "Helsinki-NLP/opus-mt-uk-en",
     "sv": "Helsinki-NLP/opus-mt-sv-en",
-    # All others fall back to multilingual
+    "id": "Helsinki-NLP/opus-mt-id-en",
     "hi": "Helsinki-NLP/opus-mt-mul-en",
     "sw": "Helsinki-NLP/opus-mt-mul-en",
     "tl": "Helsinki-NLP/opus-mt-mul-en",
     "ms": "Helsinki-NLP/opus-mt-mul-en",
     "bn": "Helsinki-NLP/opus-mt-mul-en",
     "ta": "Helsinki-NLP/opus-mt-mul-en",
-    "id": "Helsinki-NLP/opus-mt-id-en",
+    "ur": "Helsinki-NLP/opus-mt-mul-en",
+    "fa": "Helsinki-NLP/opus-mt-mul-en",
+    "vi": "Helsinki-NLP/opus-mt-mul-en",
+    "th": "Helsinki-NLP/opus-mt-mul-en",
 }
 
 MULTILINGUAL_FALLBACK = "Helsinki-NLP/opus-mt-mul-en"
@@ -149,7 +149,7 @@ class LyricsTranslator:
                 translated = self._translate(clean, seg_lang)
                 translated = self._postprocess(translated)
             except Exception as e:
-                logger.warning(f"Translation failed for lang={seg_lang}: {e}, returning original")
+                logger.warning(f"Translation failed for lang={seg_lang}: {e}")
                 translated = raw
 
             results.append({
@@ -182,16 +182,31 @@ class LyricsTranslator:
                 tok = MarianTokenizer.from_pretrained(model_name)
                 mdl = MarianMTModel.from_pretrained(model_name)
             except Exception:
-                logger.warning(f"  {model_name} failed, using multilingual fallback")
+                logger.warning(f"  {model_name} not found, using multilingual fallback")
                 tok = MarianTokenizer.from_pretrained(MULTILINGUAL_FALLBACK)
                 mdl = MarianMTModel.from_pretrained(MULTILINGUAL_FALLBACK)
             self._models[src] = (tok, mdl)
 
         tokenizer, model = self._models[src]
-        inputs = tokenizer([text], return_tensors="pt", padding=True,
-                           truncation=True, max_length=512)
-        translated = model.generate(**inputs, num_beams=4, early_stopping=True)
-        return tokenizer.decode(translated[0], skip_special_tokens=True)
+
+        # Chunk long text to avoid 512 token hard limit
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+        if not sentences:
+            sentences = [text]
+
+        translated_parts = []
+        for sentence in sentences:
+            inputs = tokenizer(
+                [sentence],
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=512,
+            )
+            output = model.generate(**inputs, num_beams=4, early_stopping=True)
+            translated_parts.append(tokenizer.decode(output[0], skip_special_tokens=True))
+
+        return " ".join(translated_parts)
 
     def _deepl(self, text: str) -> str:
         import os
@@ -210,8 +225,14 @@ class LyricsTranslator:
         resp = openai.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a professional song lyrics translator. Preserve poetic style. Output ONLY the English translation."},
-                {"role": "user", "content": f"Translate from {src} to English:\n\n{text}"},
+                {
+                    "role": "system",
+                    "content": "You are a professional song lyrics translator. Preserve poetic style. Output ONLY the English translation.",
+                },
+                {
+                    "role": "user",
+                    "content": f"Translate from {src} to English:\n\n{text}",
+                },
             ],
             temperature=0.3,
         )
